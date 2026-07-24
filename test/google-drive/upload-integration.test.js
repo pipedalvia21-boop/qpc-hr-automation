@@ -5,7 +5,7 @@ const fssync = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const {uploadFile, getShareLink, resolveDriveFolderPath, resolveDriveFileByPath} = require('../services/google-drive-service');
+const {uploadFile, getShareLink, resolveDriveFolderPath, resolveDriveFileByPath} = require('../../services/google-drive-service');
 
 // Helper: a fake Drive client that records calls and serves canned responses.
 function createFakeDrive({folderById = {}, fileById = {}} = {}) {
