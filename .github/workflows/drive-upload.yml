@@ -1,0 +1,49 @@
+# Drive Upload — Epic 5 (KR 5.1, 5.2, 5.3, 5.4, 5.5)
+#
+# Triggered by the `intern-application-received` repository_dispatch
+# event fired by services/firer-service.js. Decodes the resume from the
+# dispatch payload, uploads it to Drive under the configured folder, and
+# writes the shareable link to $GITHUB_OUTPUT for the Coda step.
+name: Drive Upload
+
+on:
+  repository_dispatch:
+    types: [intern-application-received]
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # KR 5.2 — decode the resume from the dispatch payload
+      - name: Decode resume from payload
+        env:
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          RESUME_OUT_DIR: ${{ runner.temp }}/resumes
+        run: node scripts/decode-resume.js
+
+      # KR 5.3 / 5.4 — upload to Drive + capture shareable link
+      - name: Upload to Drive and capture link
+        id: drive
+        env:
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          RESUME_PATH: ${{ runner.temp }}/resumes/resume
+          GDRIVE_FOLDER_PATH: ${{ vars.GDRIVE_FOLDER_PATH }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_KEY_PATH }}
+        run: node scripts/upload-resume.js
+
+      # Surface the link in the run log (KR 7.5 / runbook)
+      - name: Echo shareable link
+        run: echo "Shareable link: ${{ steps.drive.outputs.shareable_link }}"

@@ -1,0 +1,38 @@
+# Coda Row — Epic 6 (KR 6.1, 6.2, 6.3)
+#
+# Runs the Coda row step. Wired here as a separate workflow so the
+# Drive upload job and the Coda row job can also be combined into a
+# single workflow later; for now this file documents the step in
+# isolation so it can be triggered by hand.
+name: Coda Row
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [intern-application-received]
+
+jobs:
+  coda:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Add or update Coda row
+        env:
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          SHAREABLE_LINK: ${{ inputs.shareable_link || env.SHAREABLE_LINK }}
+          CODA_API_TOKEN: ${{ secrets.CODA_API_TOKEN }}
+          CODA_DOC_ID: ${{ secrets.CODA_DOC_ID }}
+          CODA_TABLE_ID: ${{ secrets.CODA_TABLE_ID }}
+        run: node scripts/coda-row-step.js

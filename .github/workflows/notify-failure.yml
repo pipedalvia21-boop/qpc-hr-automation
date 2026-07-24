@@ -1,0 +1,42 @@
+# Failure Notification — KR 8.1
+#
+# Fires when any previous workflow step in the same run fails, posts a
+# Slack message via services/notification-service.js. Stays deliberately
+# small so it can be reused as a final step in any other workflow.
+name: Notify Failure
+
+on:
+  workflow_run:
+    workflows: ['Drive Upload', 'Coda Row', 'CI']
+    types: [completed]
+
+jobs:
+  notify:
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Send Slack alert
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          node -e "
+            const {sendFailureNotification} = require('./services/notification-service');
+            sendFailureNotification({
+              stage: '${{ github.event.workflow_run.name }}',
+              message: 'Workflow run failed',
+              runId: '${{ github.event.workflow_run.html_url }}',
+            });
+          "
