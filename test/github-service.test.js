@@ -33,8 +33,8 @@ test('getAuthenticatedUser calls GET /user with the bearer token and API headers
 });
 
 test('sendGitHubRequest throws a clear error when no token is available', async () => {
-  const savedToken = process.env.GITHUB_TOKEN;
-  delete process.env.GITHUB_TOKEN;
+  const savedToken = process.env.GITHUB_DISPATCH_TOKEN;
+  delete process.env.GITHUB_DISPATCH_TOKEN;
 
   try {
     await assert.rejects(
@@ -43,9 +43,9 @@ test('sendGitHubRequest throws a clear error when no token is available', async 
     );
   } finally {
     if (savedToken === undefined) {
-      delete process.env.GITHUB_TOKEN;
+      delete process.env.GITHUB_DISPATCH_TOKEN;
     } else {
-      process.env.GITHUB_TOKEN = savedToken;
+      process.env.GITHUB_DISPATCH_TOKEN = savedToken;
     }
   }
 });
@@ -111,18 +111,18 @@ test('a failed request never includes the token in the error message', async () 
   );
 });
 
-test('getGitHubToken falls back to the GITHUB_TOKEN environment variable', () => {
-  const savedToken = process.env.GITHUB_TOKEN;
-  process.env.GITHUB_TOKEN = 'env-token';
+test('getGitHubToken falls back to the GITHUB_DISPATCH_TOKEN environment variable', () => {
+  const savedToken = process.env.GITHUB_DISPATCH_TOKEN;
+  process.env.GITHUB_DISPATCH_TOKEN = 'env-token';
 
   try {
     assert.strictEqual(getGitHubToken(), 'env-token');
     assert.strictEqual(getGitHubToken({token: 'explicit'}), 'explicit');
   } finally {
     if (savedToken === undefined) {
-      delete process.env.GITHUB_TOKEN;
+      delete process.env.GITHUB_DISPATCH_TOKEN;
     } else {
-      process.env.GITHUB_TOKEN = savedToken;
+      process.env.GITHUB_DISPATCH_TOKEN = savedToken;
     }
   }
 });

@@ -10,7 +10,7 @@ const DEFAULT_USER_AGENT = 'hr-automation-github-service';
  *
  * Parameters (Arguments):
  * - options (Object, optional):
- *   - token (string, optional): Explicit token. Falls back to env `GITHUB_TOKEN`.
+ *   - token (string, optional): Explicit token. Falls back to env `GITHUB_DISPATCH_TOKEN`.
  *
  * Returns: string - The token to use, or an empty string if none found.
  *
@@ -20,7 +20,7 @@ const DEFAULT_USER_AGENT = 'hr-automation-github-service';
  * const token = getGitHubToken({ token: 'ghp_xxx' });
  */
 function getGitHubToken(options = {}) {
-  return options.token || process.env.GITHUB_TOKEN || '';
+  return options.token || process.env.GITHUB_DISPATCH_TOKEN || '';
 }
 
 /**
@@ -59,7 +59,7 @@ function createGitHubRequestUrl(pathname, queryParams = {}) {
  * - pathname (string, required): API path relative to the base (e.g. '/user').
  * - options (Object, optional):
  *   - method (string, optional): HTTP method (default: 'GET').
- *   - token (string, optional): Token to use; falls back to GITHUB_TOKEN.
+ *   - token (string, optional): Token to use; falls back to GITHUB_DISPATCH_TOKEN.
  *   - fetchImpl (function, optional): Fetch-compatible implementation. Defaults to
  *     `globalThis.fetch`. Injected in tests so no real network is needed.
  *   - body (any, optional): Request body (JSON-stringified when present).
@@ -82,7 +82,7 @@ async function sendGitHubRequest(pathname, {method = 'GET', token, fetchImpl = g
   const authToken = getGitHubToken({token});
 
   if (!authToken) {
-    throw new Error('A GitHub token is required. Set GITHUB_TOKEN or pass token explicitly.');
+    throw new Error('A GitHub token is required. Set GITHUB_DISPATCH_TOKEN or pass token explicitly.');
   }
 
   const url = createGitHubRequestUrl(pathname, queryParams);
