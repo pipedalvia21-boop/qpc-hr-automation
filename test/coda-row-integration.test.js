@@ -1,7 +1,7 @@
 const assert = require('node:assert');
 const test = require('node:test');
 
-const {addRowToTable, findUniqueRowByLookup, updateRowInTableByLookup} = require('../services/coda-service');
+const {addRowToTable, updateRowInTableByLookup} = require('../services/coda-service');
 
 function buildFakeFetch(rows) {
   return async (url, options = {}) => {
