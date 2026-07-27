@@ -101,7 +101,13 @@ async function sendGitHubRequest(pathname, {method = 'GET', token, fetchImpl = g
   if (!response.ok) {
     const errorBody = await response.text();
     // Deliberately excludes the token so it can never leak into logs.
-    throw new Error(`GitHub API request to ${pathname} failed with status ${response.status}${errorBody ? `: ${errorBody}` : ''}`);
+    const error = new Error(`GitHub API request to ${pathname} failed with status ${response.status}${errorBody ? `: ${errorBody}` : ''}`);
+    // Attached so callers (e.g. firer-service.js) can classify the failure
+    // by status/headers instead of parsing the message.
+    error.status = response.status;
+    error.body = errorBody;
+    error.headers = response.headers;
+    throw error;
   }
 
   // Dispatch endpoints reply 204 No Content; guard against parsing an empty body.

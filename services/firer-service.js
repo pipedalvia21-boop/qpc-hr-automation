@@ -10,8 +10,12 @@
 
 require('dotenv').config();
 
+const path = require('node:path');
+const fsp = require('node:fs/promises');
+
+const {sendGitHubRequest} = require('./github-service');
+
 const DEFAULT_EVENT_TYPE = 'intern-application-received';
-const DEFAULT_API_BASE_URL = 'https://api.github.com';
 
 /**
  * Brief Summary: Resolve the GitHub token used to call the dispatch API.
@@ -31,8 +35,13 @@ const DEFAULT_API_BASE_URL = 'https://api.github.com';
  * const token = getDispatchToken();
  */
 function getDispatchToken(options = {}) {
-  // TODO(KR 3.1): return options.token || process.env.GITHUB_DISPATCH_TOKEN
-  // and throw a clear Error when neither is set.
+  const token = options.token || process.env.GITHUB_DISPATCH_TOKEN;
+
+  if (!token) {
+    throw new Error('A GitHub token is required. Set GITHUB_DISPATCH_TOKEN or pass token explicitly.');
+  }
+
+  return token;
 }
 
 /**
@@ -46,7 +55,6 @@ function getDispatchToken(options = {}) {
  *   - repo (string, required): Repository name.
  *   - token (string, optional): Override token; else getDispatchToken().
  *   - fetchImpl (function, optional): (input, init) => Promise<Response>.
- *   - apiBaseUrl (string, optional): Override the GitHub API base.
  *
  * Returns: { dispatchEvent, getOwner, getRepo }
  *
@@ -56,9 +64,35 @@ function getDispatchToken(options = {}) {
  * const client = createGitHubDispatchClient({ owner: 'acme', repo: 'hr' });
  */
 function createGitHubDispatchClient(options = {}) {
-  // TODO(KR 3.1): validate options.owner, options.repo, and resolve the
-  // token. Return an object whose dispatchEvent(type, payload) method
-  // POSTs to /repos/{owner}/{repo}/dispatches with the documented schema.
+  const {owner, repo, fetchImpl = globalThis.fetch} = options;
+
+  if (!owner) {
+    throw new Error('owner is required to create a GitHub dispatch client.');
+  }
+
+  if (!repo) {
+    throw new Error('repo is required to create a GitHub dispatch client.');
+  }
+
+  const token = getDispatchToken(options);
+
+  async function dispatchEvent(eventType, clientPayload) {
+    return sendGitHubRequest(`/repos/${owner}/${repo}/dispatches`, {
+      method: 'POST',
+      token,
+      fetchImpl,
+      body: {
+        event_type: eventType,
+        ...(clientPayload !== undefined && clientPayload !== null ? {client_payload: clientPayload} : {}),
+      },
+    });
+  }
+
+  return {
+    dispatchEvent,
+    getOwner: () => owner,
+    getRepo: () => repo,
+  };
 }
 
 /**
@@ -82,9 +116,18 @@ function createGitHubDispatchClient(options = {}) {
  * const enc = await encodeResumeAttachment(buffer, { strategy: 'base64' });
  */
 async function encodeResumeAttachment(content, options = {}) {
-  // TODO(KR 3.2): implement base64 encoding for the default strategy.
-  // For 'stage', write the buffer to options.stagingPath using
-  // fs.promises.writeFile and return only the reference.
+  const {strategy = 'base64', filename, stagingPath} = options;
+
+  if (strategy === 'stage') {
+    if (!stagingPath) {
+      throw new Error('stagingPath is required when strategy is "stage".');
+    }
+
+    await fsp.writeFile(stagingPath, content);
+    return {encoding: 'stage', reference: stagingPath, filename};
+  }
+
+  return {encoding: 'base64', content: content.toString('base64'), filename};
 }
 
 /**
@@ -106,10 +149,46 @@ async function encodeResumeAttachment(content, options = {}) {
  * const payload = await buildDispatchPayload(application);
  */
 async function buildDispatchPayload(application, options = {}) {
-  // TODO(KR 3.3): pull firstName/lastName/position/email/body/attachment
-  // off `application`, encode the resume via encodeResumeAttachment, and
-  // return the { event_type, client_payload } object documented in
-  // GitHub's REST API for /repos/{owner}/{repo}/dispatches.
+  if (!application || typeof application !== 'object') {
+    throw new Error('application is required to build a dispatch payload.');
+  }
+
+  const requiredFields = ['firstName', 'lastName', 'position', 'senderEmail', 'attachment'];
+  const missingFields = requiredFields.filter((field) => application[field] === undefined || application[field] === null);
+
+  if (missingFields.length) {
+    throw new Error(`application is missing required field(s): ${missingFields.join(', ')}`);
+  }
+
+  const {firstName, lastName, position, senderEmail, body, attachment} = application;
+  const encodingStrategy = options.encodingStrategy || 'base64';
+  const stagingPath = encodingStrategy === 'stage' && options.stagingDir
+    ? path.join(options.stagingDir, attachment.filename)
+    : options.stagingPath;
+
+  const encodedAttachment = await encodeResumeAttachment(attachment.content, {
+    strategy: encodingStrategy,
+    filename: attachment.filename,
+    stagingPath,
+  });
+
+  return {
+    event_type: options.eventType || DEFAULT_EVENT_TYPE,
+    client_payload: {
+      senderEmail,
+      firstName,
+      lastName,
+      position,
+      body: body || '',
+      attachment: {
+        filename: attachment.filename,
+        mimeType: attachment.mimeType,
+        encoding: encodedAttachment.encoding,
+        ...(encodedAttachment.content !== undefined ? {content: encodedAttachment.content} : {}),
+        ...(encodedAttachment.reference !== undefined ? {reference: encodedAttachment.reference} : {}),
+      },
+    },
+  };
 }
 
 /**
@@ -131,9 +210,41 @@ async function buildDispatchPayload(application, options = {}) {
  * await fireApplicationEvent(client, application);
  */
 async function fireApplicationEvent(client, application, options = {}) {
-  // TODO(KR 3.3, 3.4): call buildDispatchPayload, then POST via the
-  // client's dispatchEvent. Map the response into a DispatchError when
-  // !response.ok, classifying the failure by status code and headers.
+  const payload = await buildDispatchPayload(application, options);
+
+  try {
+    await client.dispatchEvent(payload.event_type, payload.client_payload);
+  } catch (err) {
+    throw classifyDispatchError(err);
+  }
+
+  return {status: 204};
+}
+
+/**
+ * Classifies a failed dispatch request into the reason categories documented
+ * in docs/architecture.md and docs/runbook.md: 'auth', 'rate_limited',
+ * 'payload_too_large', or 'network'.
+ */
+function classifyDispatchError(err) {
+  const status = err && err.status;
+
+  if (status === 401) {
+    return new DispatchError('auth', {status, body: err.body});
+  }
+
+  if (status === 403) {
+    const remaining = err.headers && typeof err.headers.get === 'function'
+      ? err.headers.get('x-ratelimit-remaining')
+      : undefined;
+    return new DispatchError(remaining === '0' ? 'rate_limited' : 'auth', {status, body: err.body});
+  }
+
+  if (status === 422) {
+    return new DispatchError('payload_too_large', {status, body: err.body});
+  }
+
+  return new DispatchError('network', {status, body: err && err.message});
 }
 
 /**
@@ -141,7 +252,7 @@ async function fireApplicationEvent(client, application, options = {}) {
  */
 class DispatchError extends Error {
   constructor(reason, {status, body} = {}) {
-    super(`Dispatch failed: ${reason}${status ? ` (status ${status})` : ''}`);
+    super(`${reason}${status ? ` (status ${status})` : ''}`);
     this.name = 'DispatchError';
     this.reason = reason;
     this.status = status;
@@ -152,7 +263,6 @@ class DispatchError extends Error {
 module.exports = {
   buildDispatchPayload,
   createGitHubDispatchClient,
-  DEFAULT_API_BASE_URL,
   DEFAULT_EVENT_TYPE,
   DispatchError,
   encodeResumeAttachment,

@@ -20,10 +20,11 @@ The HR automation pipeline is split into three concerns, each isolated in its ow
 - Combines the pieces into the normalized envelope used by every downstream step (KR 2.4).
 
 ### 3. Firer (`services/firer-service.js`)
-- Wraps the GitHub REST API for `repository_dispatch`.
+- Wraps the GitHub REST API for `repository_dispatch`, built on top of the generic client in `services/github-service.js` (`createGitHubDispatchClient` calls `sendGitHubRequest` rather than making its own network calls) (KR 3.1).
 - Encodes the resume (base64 in payload by default; staging path is a fallback for huge files) (KR 3.2).
 - Builds and fires the payload under event type `intern-application-received` (KR 3.3).
-- Maps non-2xx responses into a `DispatchError { reason }` so the listener can log and decide whether to retry or hold (KR 3.4).
+- Maps non-2xx responses into a `DispatchError { reason }` so the listener can log and decide whether to retry or hold (KR 3.4). Classification reads the `status` and `headers` that `sendGitHubRequest` now attaches to its thrown errors, rather than parsing the error message.
+- Reads its token from `GITHUB_DISPATCH_TOKEN` (see `docs/env-vars.md`) — the same variable `services/github-service.js` falls back to internally.
 
 ### 4. GitHub Actions workflow (`.github/workflows/drive-upload.yml`)
 - Triggered by the `intern-application-received` event.
