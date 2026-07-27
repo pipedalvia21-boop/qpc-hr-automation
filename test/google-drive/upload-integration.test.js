@@ -5,12 +5,12 @@ const fssync = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const {uploadFile, getShareLink, resolveDriveFolderPath, resolveDriveFileByPath} = require('../../services/google-drive-service');
+const {uploadFile, getShareLink} = require('../../services/google-drive-service');
 
 // Helper: a fake Drive client that records calls and serves canned responses.
 // Created files/folders are stored in `items` so later files.list calls can find them,
 // mirroring how a real Drive create-then-list round trip behaves.
-function createFakeDrive({folderById = {}, fileById = {}} = {}) {
+function createFakeDrive() {
   const calls = [];
   const items = [];
 

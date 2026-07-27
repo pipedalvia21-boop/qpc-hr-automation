@@ -192,7 +192,7 @@ function createImapService(options = {}) {
       try {
         await establishConnection();
         reconnecting = false;
-      } catch (err) {
+      } catch {
         // establishConnection already logged the cause; back off and try again.
         reconnecting = false;
         scheduleReconnect();

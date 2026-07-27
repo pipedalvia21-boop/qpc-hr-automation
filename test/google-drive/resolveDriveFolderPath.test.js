@@ -25,7 +25,7 @@ test('resolveDriveFolderPath creates missing folder when requested', async () =>
   const fakeDrive = {
     files: {
       list: async () => ({ data: { files: [] } }),
-      create: async (opts) => {
+      create: async () => {
         created = true;
         return { data: { id: 'new-folder' } };
       },

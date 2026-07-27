@@ -13,7 +13,7 @@
 // This is safe if `dotenv` is not installed — it will be ignored.
 try {
   require('dotenv').config();
-} catch (e) {
+} catch {
   // dotenv not installed; continue without failing.
 }
 
