@@ -1,0 +1,12 @@
+{
+  "senderEmail": "ada.lovelace@example.com",
+  "firstName": "Ada",
+  "lastName": "Lovelace",
+  "position": "Software Engineer Intern",
+  "body": "Hello, please find my resume attached. Best, Ada",
+  "attachment": {
+    "filename": "ada-lovelace-resume.pdf",
+    "mimeType": "application/pdf",
+    "content": "JVBERi0xLjQKJSBTYW1wbGUgcmVzdW1lIGZvciBBZGEgTG92ZWxhY2Ug4oCUIEhSIGF1dG9tYXRpb24gZW5kLXRvLWVuZCB0ZXN0IGZpeHR1cmUKMSAwIG9iajw8IC9UeXBlIC9DYXRhbG9nID4+ZW5kb2JqCiUlRU9GCg=="
+  }
+}
